@@ -30,6 +30,7 @@
 *.exe
 *.out
 *.app
+.vs/
 Debug/
 Release/
 ASCII_GAME/Debug/
