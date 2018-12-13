@@ -55,6 +55,9 @@
     <Filter Include="Game\GameObjects\GameSprites">
       <UniqueIdentifier>{15783cd8-bf33-4e6b-ae84-ab318b6766b0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{ad0bfeff-065b-4f33-bb43-e719a97c47f8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Renderer\ASCIIRenderer.h">
@@ -114,5 +117,10 @@
     <ClInclude Include="GameOverSprites.h">
       <Filter>Game\GameObjects\GameSprites</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="HighScore.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

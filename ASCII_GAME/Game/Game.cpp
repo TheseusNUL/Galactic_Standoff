@@ -2,6 +2,9 @@
 #include <windows.h>
 #include <MMSystem.h>
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <algorithm>
 #include "../Core/Utils.h"
 #include "../Core/Renderer/ASCIIRenderer.h"
 #include "../Core/Renderer/AnimatedSprite.h"
@@ -11,8 +14,6 @@
 #include "../InGameSprites.h"
 #include "../GameOverSprites.h"
 #include "../WinnerSprites.h"
-
-
 
 const int SCREEN_WIDTH = 256;
 const int SCREEN_HEIGHT = 96;
@@ -35,7 +36,6 @@ Game::Game()
 , m_Background(SCREEN_WIDTH, SCREEN_HEIGHT) //Initialise background to the screen size.
 , m_Score(0) //Initialise score to 0.
 {
-	
 }
 
 Game::~Game()
@@ -52,6 +52,8 @@ void Game::Initialise()
 	InitialiseRenderer();
 
 	InitialiseMainMenu();
+
+	InitialiseHighScoresMenu();
 
 	InitialiseDifficultySelect();
 
@@ -81,7 +83,7 @@ void Game::InitialiseMainMenu()
 	m_Play.Initialise(&PlaySprite[0][0], Vector3(PLAY_SPIRTE_WIDTH, PLAY_SPRITE_HEIGHT, PLAY_SPRITE_ANIMATION_FRAMES));
 	m_Quit.Initialise(EscQuitSprite, EscQuitSize);
 
-	PlaySound("Main_Menu_Theme", NULL, SND_ASYNC);
+	PlaySound("../Sounds/Main_Menu_Theme", NULL, SND_ASYNC);
 
 	//Set position of sprite
 	Vector2 titlePosition((SCREEN_WIDTH / 2) - (titleSize.x / 2), 20);
@@ -92,6 +94,28 @@ void Game::InitialiseMainMenu()
 	m_Play.SetPosition(playPosition);
 	Vector2 quitPosition((SCREEN_WIDTH / 2) - (EscQuitSize.x / 2), 80);
 	m_Quit.SetPosition(quitPosition);
+}
+
+void Game::InitialiseHighScoresMenu()
+{
+	ReadFromFile(); //reads scores from file.
+	std::sort(m_HighScores.begin(), m_HighScores.end()); //sorts scores in acceding order.
+	std::reverse(m_HighScores.begin(), m_HighScores.end()); //Reverses the order of the list, sorting them into decending order.
+
+	for (int i = m_HighScores.size() - 1; i >= 0; i--) //due to arrays starting at element 0, the -1 stops the game from crashing.
+	{
+		m_Scores.push_back(new ScoreDisplay[4]); 		//pushes new score display into ScoreDisplay vector.
+		for (int j = 0; j < 4; j++)
+		{
+			int arrayWidth = (DIGIT_WIDTH * 4) + (3 * 3);
+			int position = (SCREEN_WIDTH / 2) - (arrayWidth / 2); //Sets array to the middle of the screen width.
+
+			m_Scores.back()[j].Initialise(Vector2(position + (j * 10), 5 + (i * 11)));
+			UpdateScoreDisplay(m_Scores.back(), m_HighScores[i]);
+		}
+
+		m_Scores.back()->SetDigitValue(m_HighScores[i]); //Gets the score display that was pushed into vector and stores the value of the array into the score display
+	}
 }
 
 void Game::InitialiseDifficultySelect()
@@ -136,6 +160,12 @@ void Game::InitialiseGame()
 		m_PlayerHealth[i].SetPosition(Vector2(SCREEN_WIDTH - 70 + (i * m_PlayerHealth[i].GetSize().x + 2), 2));
 	}
 
+	for (int i = 0; i < m_HighScores.size(); i++)
+	{
+		if (m_Score > m_HighScores[i])
+			m_HighScores.insert(m_HighScores.begin() + i, m_Score);
+	}
+
 	m_Score = 0;
 
 	playerLives = 3;
@@ -152,6 +182,18 @@ void Game::InitialiseGameOver()
 	m_GameOver.SetPosition(gameOverPosition);
 	Vector2 returnMenuPostion((SCREEN_WIDTH - ReturnMenuSize.x) - 3, 90);
 	m_Return.SetPosition(returnMenuPostion);
+
+	for (int i = 0; i < m_EnemyShips.size(); i++) //Deletes enemy ships.
+		delete m_EnemyShips[i];
+
+	m_EnemyShips.clear(); //Empties vector
+
+	m_EnemyShips.clear(); //Empties vector
+
+	for (int i = 0; i < m_PlayerMissiles.size(); i++) //Deletes player missiles.
+		delete m_PlayerMissiles[i];
+
+	m_PlayerMissiles.clear(); //Empties vector
 }
 
 void Game::InitialiseYouWin()
@@ -165,6 +207,16 @@ void Game::InitialiseYouWin()
 	m_YouWin.SetPosition(youWinTitlePosition);
 	Vector2 youWinShipPosition((SCREEN_WIDTH / 2) - YouWinShipSpriteSize.x / 2, SCREEN_HEIGHT / 3);
 	m_YouWinShip.SetPosition(youWinShipPosition);
+
+	for (int i = 0; i < m_EnemyShips.size(); i++) //Deletes enemy ships.
+		delete m_EnemyShips[i];
+
+	m_EnemyShips.clear(); //Empties vector
+
+	for (int i = 0; i < m_PlayerMissiles.size(); i++) //Deletes player missiles.
+		delete m_PlayerMissiles[i];
+
+	m_PlayerMissiles.clear(); //Empties vector
 	
 }
 
@@ -208,9 +260,14 @@ void Game::Update()
 
 void Game::UpdateMainMenu()
 {
-	if (GetKeyState(69) < 0 || GetKeyState(101) < 0) //Press E or e to change state to in game.
+	if (GetKeyState(69) < 0 || GetKeyState(101) < 0) //Press E or e to change state to difficulty select.
 	{
 		m_GameState = E_GAME_STATE_SELECT_DIFFICULTY;
+	}
+
+	if (GetKeyState(70) < 0 || GetKeyState(102) < 0) //Press F or f to change state to high score menu.
+	{
+		m_GameState = E_GAME_STATE_HIGH_SCORES;
 	}
 
 	//Updates animations
@@ -324,19 +381,17 @@ void Game::UpdateGame() //Functionality that should only be available inside of 
 		return;
 	}
 
-	static bool spaceWasPressed = false;
+	m_PlayerCounter++;
+
 	if (GetKeyState(VK_SPACE) < 0) //Fire player missile if space bar is pressed
 	{
-		if (!spaceWasPressed)
+		
+		if (m_PlayerCounter >= 10) //Stops player spamming fire missile.
 		{
 			FireMissile();
-			PlaySound("Player_Missile.wav", NULL, SND_ASYNC);
-			spaceWasPressed = true;
+			PlaySound("../Sounds/Player_Missile.wav", NULL, SND_ASYNC);
+			m_PlayerCounter = 0;
 		}
-	}
-	else
-	{
-		spaceWasPressed = false;
 	}
 
 
@@ -357,7 +412,7 @@ void Game::UpdateGame() //Functionality that should only be available inside of 
 			if (m_EnemyShips[i]->Update(deltaTime)) //Enemy fires
 			{
 				FireEnemyMissile(*m_EnemyShips[i]);
-				PlaySound("Enemy_Missile.wav", NULL, SND_ASYNC);
+				PlaySound("../Sounds/Enemy_Missile.wav", NULL, SND_ASYNC);
 			}
 
 			if (m_EnemyShips[i]->GetPosition().x + m_EnemyShips[i]->GetSize().x < 0) // if enemy goes off screen, player looses life
@@ -385,7 +440,7 @@ void Game::UpdateGame() //Functionality that should only be available inside of 
 	UpdateEnemyMissiles();
 	UpdatePlayerMissiles();
 
-	UpdateScoreDisplay();
+	UpdateScoreDisplay(m_ScoreDigit, m_Score);
 }
 
 void Game::FireMissile()
@@ -497,24 +552,24 @@ void Game::UpdateEnemyMissiles()
 } 
 
 
-void Game::UpdateScoreDisplay()
+void Game::UpdateScoreDisplay(ScoreDisplay *display, int value)
 {
 	for (int i = 0; i < 4; i++)
 	{
-		m_ScoreDigit[i].Update(0.0f);
+		display[i].Update(0.0f);
 	}
 
 	int ScoreValues[4];
 
-	ScoreValues[3] = m_Score > 9999 ? 9 : m_Score % 10;
-	ScoreValues[2] = m_Score > 9999 ? 9 : m_Score / 10 % 10;
-	ScoreValues[1] = m_Score > 9999 ? 9 : m_Score / 100 % 10;
-	ScoreValues[0] = m_Score > 9999 ? 9 : m_Score / 1000 % 10;
+	ScoreValues[3] = value > 9999 ? 9 : value % 10;
+	ScoreValues[2] = value > 9999 ? 9 : value / 10 % 10;
+	ScoreValues[1] = value > 9999 ? 9 : value / 100 % 10;
+	ScoreValues[0] = value > 9999 ? 9 : value / 1000 % 10;
 
-	m_ScoreDigit[0].SetDigitValue(ScoreValues[0]);
-	m_ScoreDigit[1].SetDigitValue(ScoreValues[1]);
-	m_ScoreDigit[2].SetDigitValue(ScoreValues[2]);
-	m_ScoreDigit[3].SetDigitValue(ScoreValues[3]);
+	display[0].SetDigitValue(ScoreValues[0]);
+	display[1].SetDigitValue(ScoreValues[1]);
+	display[2].SetDigitValue(ScoreValues[2]);
+	display[3].SetDigitValue(ScoreValues[3]);
 }
 
 void Game::NewRoundBegins()
@@ -543,18 +598,6 @@ void Game::UpdateGameOver()
 		m_GameState = E_GAME_STATE_MAIN_MENU;
 		
 		InitialiseGame(); //Reset game to original values.
-		
-		for (int i = 0; i < m_EnemyShips.size(); i++) //Deletes enemy ships.
-			delete m_EnemyShips[i];
-
-		m_EnemyShips.clear(); //Empties vector
-
-		m_EnemyShips.clear(); //Empties vector
-
-		for (int i = 0; i < m_PlayerMissiles.size(); i++) //Deletes player missiles.
-			delete m_PlayerMissiles[i];
-
-		m_PlayerMissiles.clear(); //Empties vector
 	}
 }
 
@@ -565,17 +608,6 @@ void Game::UpdateYouWin()
 		m_GameState = E_GAME_STATE_MAIN_MENU;
 
 		InitialiseGame(); //Reset game to original values.
-
-		for (int i = 0; i < m_EnemyShips.size(); i++) //Deletes enemy ships.
-			delete m_EnemyShips[i];
-
-		m_EnemyShips.clear(); //Empties vector
-
-		for (int i = 0; i < m_PlayerMissiles.size(); i++) //Deletes player missiles.
-			delete m_PlayerMissiles [i];
-
-		m_PlayerMissiles.clear(); //Empties vector
-				
 	}
 }
 
@@ -586,6 +618,18 @@ void Game::RenderMainMenu()
 	m_SirenTitle.Render(m_pRenderer);
 	m_Play.Render(m_pRenderer);
 	m_Quit.Render(m_pRenderer);
+}
+
+void Game::RenderHighScoresMenu()
+{
+	for (int i = 0; i < m_Scores.size(); i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			ScoreDisplay* temp = m_Scores[i];
+			temp[j].Render(m_pRenderer);
+		}
+	}
 }
 
 void Game::RenderDifficultySelect()
@@ -668,6 +712,8 @@ void Game::Render()
 	{
 	case E_GAME_STATE_MAIN_MENU: RenderMainMenu();
 		break;
+	case E_GAME_STATE_HIGH_SCORES: RenderHighScoresMenu();
+		break;
 	case E_GAME_STATE_SELECT_DIFFICULTY: RenderDifficultySelect();
 		break;
 	case E_GAME_STATE_IN_GAME: RenderGame();
@@ -681,3 +727,40 @@ void Game::Render()
 	m_pRenderer->Render();
 }
 
+void Game::ReadFromFile()
+{
+	InFile.open("../ASCII_GAME/HighScores.txt"); //Opens file.
+
+	if (InFile.fail()) //Checks for error.
+	{
+		//std::cerr << "File could not open.";
+		return;
+	}
+
+	std::string line;
+	while (std::getline(InFile, line)) //get every line from InFile and store them in line.
+	{
+		m_HighScores.push_back(std::stoi(line)); //stoi - string to integer.
+	}
+}
+
+void Game::WriteToFile()
+{
+	OutFile.open("../ASCII_GAME/HighScores.txt.tmp");
+
+	int maxScores;
+
+	if (m_HighScores.size() > 5)
+		maxScores = 5;
+	else
+		maxScores = m_HighScores.size();
+
+	for (int i = 0; i < maxScores; i++)
+	{
+		OutFile << m_HighScores[i];
+	}
+
+	OutFile.close();
+
+	MoveFile("../ASCII_GAME/HighScores.txt.tmp", "../ASCII_GAME/HighScores.txt");
+}

@@ -102,6 +102,9 @@
     <ClInclude Include="Missile.h" />
     <ClInclude Include="WinnerSprites.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="HighScore.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

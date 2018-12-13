@@ -2,7 +2,7 @@
 #define _GAME_H
 
 #include <vector>
-#include <string>
+#include <fstream>
 #include "GameStates.h"
 #include "../Core/Renderer/Sprite.h"
 #include "../Game/GameObjects/ScoreDisplay.h"
@@ -39,15 +39,16 @@ private:
 	void Render();
 
 	void InitialiseMainMenu();
+	void InitialiseHighScoresMenu();
+	void InitialiseDifficultySelect();
 	void InitialiseGame();
 	void InitialiseGameOver();
 	void InitialiseYouWin();
-	void InitialiseDifficultySelect();
-
+	
 	void UpdateMainMenu();
 	void UpdateDifficultySelect();
 	void UpdateGame();
-	void UpdateScoreDisplay();
+	void UpdateScoreDisplay(ScoreDisplay *display, int value);
 	void UpdateGameOver();
 	void UpdateYouWin();
 	void UpdatePlayerMissiles();
@@ -63,9 +64,13 @@ private:
 
 	void NewRoundBegins();
 
+	void ReadFromFile();
+	void WriteToFile();
+
 	void RenderMainMenu();
-	void RenderGame();
+	void RenderHighScoresMenu();
 	void RenderDifficultySelect();
+	void RenderGame();
 	void RenderScore();
 	void RenderGameOver();
 	void RenderYouWin();
@@ -80,9 +85,8 @@ private:
 	bool m_bExitApp;
 
 	int m_Score;
-
 	int m_EnemyCounter;
-
+	int m_PlayerCounter;
 
 	Player m_Player;
 
@@ -91,6 +95,12 @@ private:
 	std::vector<Missile*> m_EnemyMissiles;
 
 	std::vector<EnemyShip*> m_EnemyShips;
+
+	std::vector<int> m_HighScores;
+	std::vector<ScoreDisplay*> m_Scores;
+
+	std::ifstream InFile;
+	std::ofstream OutFile;
 	
 	ScoreDisplay m_ScoreDigit[4];
 	
