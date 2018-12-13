@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+Debug/
+Release/
+ASCII_GAME/Debug/
+ASCII_GAME/Release/
